@@ -37,7 +37,23 @@ await build({
       'const require = __apronCreateRequire(import.meta.url);',
     ].join('\n'),
   },
-  external: ['pg', 'pg-native', 'ioredis', 'bullmq', 'pino', 'pino-pretty', 'nodemailer', 'openai'],
+  // `argon2` belongs here for the same reason as `pg`: it is a native module, and bundling
+  // it broke the seed. Its CommonJS entry reads `__dirname` to locate its own .node binary,
+  // and an ESM bundle has no `__dirname` — so `node dist-worker/seed.js` failed with
+  // "the argon2 module could not be loaded" the moment it hashed the first password. That
+  // is the documented deployment path for creating the first administrator, so it failed
+  // in the one place it could not be allowed to.
+  external: [
+    'argon2',
+    'pg',
+    'pg-native',
+    'ioredis',
+    'bullmq',
+    'pino',
+    'pino-pretty',
+    'nodemailer',
+    'openai',
+  ],
   alias: {
     '@': join(root, 'src'),
   },

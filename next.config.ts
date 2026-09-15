@@ -13,7 +13,11 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: false,
   },
-  serverExternalPackages: ['pg', 'bullmq', 'ioredis', 'pino'],
+  // Native or dynamically-loading packages that must stay outside the server bundle.
+  // `argon2` is here explicitly rather than relying on Next's own detection: the same
+  // package broke the worker bundle by being left in, and password hashing is not a thing
+  // to discover is broken at the first sign-in.
+  serverExternalPackages: ['argon2', 'pg', 'bullmq', 'ioredis', 'pino'],
 };
 
 export default nextConfig;
