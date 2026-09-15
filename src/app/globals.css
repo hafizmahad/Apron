@@ -1,0 +1,198 @@
+@import 'tailwindcss';
+
+/*
+ * Apron design tokens.
+ *
+ * Layer 1 (`--apron-*`) is the palette supplied verbatim in the asset pack's
+ * DESIGN_TOKENS.css. It is the only place raw hex appears.
+ * Layer 2 (`@theme`) is the semantic vocabulary components are allowed to use
+ * (CLAUDE.md §21, ADR-013). No component may reference a raw hex value or an
+ * `--apron-*` primitive directly.
+ */
+
+:root {
+  /* --- supplied pack primitives (do not edit; mirror of DESIGN_TOKENS.css) --- */
+  --apron-canvas: #f7f4ef;
+  --apron-surface: #ffffff;
+  --apron-sidebar: #0f2238;
+  --apron-sidebar-soft: #173451;
+  --apron-text: #0d1a2a;
+  --apron-text-muted: #61758a;
+  --apron-border: #e7edf3;
+  --apron-accent: #8b2136;
+  --apron-accent-hover: #a72a45;
+  --apron-gold: #c7a56a;
+  --apron-success: #1d8a68;
+  --apron-warning: #d7983a;
+  --apron-danger: #c84b4b;
+  --apron-radius-sm: 10px;
+  --apron-radius-md: 14px;
+  --apron-radius-lg: 20px;
+  --apron-shadow-soft: 0 12px 40px rgba(15, 34, 56, 0.08);
+
+  /* --- derived primitives, mixed from the supplied palette only --- */
+  --apron-canvas-cool: #f4f6f9;
+  --apron-elevated: #fbfaf7;
+  --apron-border-strong: #d4dde7;
+  --apron-sidebar-deep: #0a1828;
+  --apron-text-inverse: #f4f7fa;
+  --apron-text-inverse-muted: #9db0c4;
+  --apron-info: #2f6f9f;
+  --apron-accent-wash: #f8eef0;
+  --apron-success-wash: #e8f4f0;
+  --apron-warning-wash: #fdf4e6;
+  --apron-danger-wash: #fbeded;
+  --apron-info-wash: #eaf2f8;
+  --apron-gold-wash: #f8f2e6;
+}
+
+@theme inline {
+  /* surfaces */
+  --color-canvas: var(--apron-canvas);
+  --color-canvas-cool: var(--apron-canvas-cool);
+  --color-surface: var(--apron-surface);
+  --color-elevated: var(--apron-elevated);
+  --color-sidebar: var(--apron-sidebar);
+  --color-sidebar-soft: var(--apron-sidebar-soft);
+  --color-sidebar-deep: var(--apron-sidebar-deep);
+
+  /* text */
+  --color-text-primary: var(--apron-text);
+  --color-text-secondary: var(--apron-text-muted);
+  --color-text-inverse: var(--apron-text-inverse);
+  --color-text-inverse-muted: var(--apron-text-inverse-muted);
+
+  /* lines */
+  --color-border: var(--apron-border);
+  --color-border-strong: var(--apron-border-strong);
+
+  /* action + status */
+  --color-accent: var(--apron-accent);
+  --color-accent-strong: var(--apron-accent-hover);
+  --color-accent-wash: var(--apron-accent-wash);
+  --color-gold: var(--apron-gold);
+  --color-gold-wash: var(--apron-gold-wash);
+  --color-success: var(--apron-success);
+  --color-success-wash: var(--apron-success-wash);
+  --color-warning: var(--apron-warning);
+  --color-warning-wash: var(--apron-warning-wash);
+  --color-danger: var(--apron-danger);
+  --color-danger-wash: var(--apron-danger-wash);
+  --color-info: var(--apron-info);
+  --color-info-wash: var(--apron-info-wash);
+
+  /* radii */
+  --radius-sm: var(--apron-radius-sm);
+  --radius-md: var(--apron-radius-md);
+  --radius-lg: var(--apron-radius-lg);
+
+  /* elevation */
+  --shadow-soft: var(--apron-shadow-soft);
+  --shadow-card: 0 1px 2px rgba(15, 34, 56, 0.04), 0 8px 24px rgba(15, 34, 56, 0.06);
+  --shadow-raised: 0 18px 50px rgba(15, 34, 56, 0.14);
+
+  /* type — editorial serif for display, neutral sans for operational UI (§21) */
+  --font-display: var(--font-apron-display), 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
+  --font-sans: var(--font-apron-sans), ui-sans-serif, system-ui, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', 'Cascadia Mono', Menlo, monospace;
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--color-canvas);
+    color: var(--color-text-primary);
+    font-family: var(--font-sans);
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /*
+   * Times, counts, SLA clocks and money must not jitter between rows: tabular figures
+   * everywhere numbers are operational data (§21).
+   */
+  .tabular,
+  table td,
+  table th,
+  time,
+  [data-numeric] {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum' 1;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    color: var(--color-text-primary);
+    text-wrap: balance;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  ::selection {
+    background-color: var(--color-accent-wash);
+    color: var(--color-accent);
+  }
+
+  /* Respect reduced-motion for every transition we ship. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@layer utilities {
+  /* Editorial display type used for page heroes and portal page titles. */
+  .font-display {
+    font-family: var(--font-display);
+    letter-spacing: -0.015em;
+  }
+
+  /* The sidebar's atmospheric artwork sits at very low emphasis behind navigation. */
+  .sidebar-atmosphere {
+    background-size: cover;
+    background-position: center bottom;
+    background-repeat: no-repeat;
+  }
+
+  /* Skeletons match final geometry; this is the only shimmer in the system. */
+  .skeleton {
+    background-image: linear-gradient(
+      90deg,
+      color-mix(in oklab, var(--color-border) 55%, transparent) 0%,
+      color-mix(in oklab, var(--color-border) 90%, transparent) 50%,
+      color-mix(in oklab, var(--color-border) 55%, transparent) 100%
+    );
+    background-size: 200% 100%;
+    animation: apron-shimmer 1.4s ease-in-out infinite;
+  }
+
+  @keyframes apron-shimmer {
+    0% {
+      background-position: 200% 0;
+    }
+    100% {
+      background-position: -200% 0;
+    }
+  }
+}

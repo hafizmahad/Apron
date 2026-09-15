@@ -1,0 +1,140 @@
+# Apron Production — local stack (CLAUDE.md §3 "Local runtime").
+#
+#   docker compose up -d postgres redis mailpit   start the datastores
+#   docker compose up --build                     start everything
+#   docker compose run --rm migrate  apply migrations
+#   docker compose run --rm seed     load the reference operational network
+#
+# `web` and `worker` are two entrypoints of the same image, so there is exactly one build.
+
+name: apron-production
+
+x-app-env: &app-env
+  NODE_ENV: production
+  APP_ENV: local
+  APP_URL: http://localhost:53000
+  DATABASE_URL: postgres://apron:apron_local_dev@postgres:5432/apron
+  REDIS_URL: redis://redis:6379
+  SESSION_SECRET: ${SESSION_SECRET:-local-development-session-secret-change-me-32}
+  AI_ENABLED: ${AI_ENABLED:-false}
+  OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+  OPENAI_INTAKE_MODEL: ${OPENAI_INTAKE_MODEL:-}
+  OPENAI_REASONING_MODEL: ${OPENAI_REASONING_MODEL:-}
+  OPENAI_RESEARCH_MODEL: ${OPENAI_RESEARCH_MODEL:-}
+  OPENAI_SUMMARY_MODEL: ${OPENAI_SUMMARY_MODEL:-}
+  MAIL_TRANSPORT: smtp
+  SMTP_HOST: mailpit
+  SMTP_PORT: 1025
+  SMTP_SECURE: false
+  MAIL_FROM: Apron Operations <ops@apron.local>
+  LOG_LEVEL: ${LOG_LEVEL:-info}
+  LOG_PRETTY: ${LOG_PRETTY:-false}
+  DOCUMENT_STORAGE_DRIVER: filesystem
+  DOCUMENT_STORAGE_PATH: /app/.apron-storage
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: apron
+      POSTGRES_PASSWORD: apron_local_dev
+      POSTGRES_DB: apron
+      # Deterministic collation so ORDER BY is identical on every machine.
+      POSTGRES_INITDB_ARGS: '--encoding=UTF8 --locale=C'
+    ports:
+      - '55432:5432'
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U apron -d apron']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: ['redis-server', '--appendonly', 'yes', '--save', '60', '1']
+    ports:
+      - '56379:6379'
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  # Local SMTP capture. Web UI on http://localhost:58025 — nothing leaves the machine.
+  mailpit:
+    image: axllent/mailpit:latest
+    ports:
+      - '58025:8025'
+      - '51025:1025'
+    environment:
+      MP_MAX_MESSAGES: 500
+      MP_SMTP_AUTH_ACCEPT_ANY: 1
+      MP_SMTP_AUTH_ALLOW_INSECURE: 1
+    restart: unless-stopped
+
+  migrate:
+    build:
+      context: .
+      target: worker
+    environment: *app-env
+    command: ['node', 'dist-worker/migrate.js']
+    depends_on:
+      postgres:
+        condition: service_healthy
+    profiles: ['tools']
+
+  seed:
+    build:
+      context: .
+      target: worker
+    environment: *app-env
+    command: ['node', 'dist-worker/seed.js']
+    depends_on:
+      postgres:
+        condition: service_healthy
+    profiles: ['tools']
+
+  web:
+    build:
+      context: .
+      target: web
+    environment: *app-env
+    ports:
+      - '53000:3000'
+    volumes:
+      - document-storage:/app/.apron-storage
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mailpit:
+        condition: service_started
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: .
+      target: worker
+    environment:
+      <<: *app-env
+      WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-4}
+    volumes:
+      - document-storage:/app/.apron-storage
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  redis-data:
+  document-storage:

@@ -1,0 +1,13 @@
+node_modules
+.next
+dist-worker
+coverage
+.git
+.github
+.apron-storage
+.env
+.env.local
+*.log
+docs
+tests
+apron-production-assets

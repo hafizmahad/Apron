@@ -1,0 +1,346 @@
+{
+  "version": "1.1.0",
+  "fileCount": 78,
+  "provenance": {
+    "05_backgrounds/login-auth.webp": {
+      "source": "Supplied for this project by the product owner (generative).",
+      "subject": "Business jet at a hangar entrance, blue hour. Generic — not a named airport.",
+      "usage": "Sign-in brand panel."
+    },
+    "05_backgrounds/client-hero.webp": {
+      "source": "Supplied for this project by the product owner (generative).",
+      "subject": "Business jet on an apron at sunrise. Generic — not a named airport.",
+      "usage": "Client composer hero."
+    },
+    "05_backgrounds/ops-sidebar.webp": {
+      "source": "Supplied for this project by the product owner (generative).",
+      "subject": "Apron at sunrise, cropped tall.",
+      "usage": "Operations sidebar atmosphere, ~14% opacity."
+    },
+    "05_backgrounds/provider-sidebar.webp": {
+      "source": "Supplied for this project by the product owner (generative).",
+      "subject": "Aircraft and sunrise at an FBO, cropped tall.",
+      "usage": "Provider sidebar atmosphere, ~14% opacity."
+    },
+    "05_backgrounds/admin-sidebar.webp": {
+      "source": "Supplied for this project by the product owner (generative).",
+      "subject": "Hangar at blue hour, darkest crop.",
+      "usage": "Admin sidebar atmosphere, ~14% opacity. The most restrained portal (§21)."
+    }
+  },
+  "imageryPolicy": "Atmospheric imagery is generic. A generic image is never presented as a photograph of a specific named airport or FBO; real identity is always rendered as structured data.",
+  "files": [
+    {
+      "path": "01_brand/app-icon.svg",
+      "bytes": 690
+    },
+    {
+      "path": "01_brand/apron-logo-dark.svg",
+      "bytes": 972
+    },
+    {
+      "path": "01_brand/apron-logo-light.svg",
+      "bytes": 972
+    },
+    {
+      "path": "01_brand/apron-mark-adaptive.svg",
+      "bytes": 1242
+    },
+    {
+      "path": "01_brand/apron-mark.svg",
+      "bytes": 599
+    },
+    {
+      "path": "02_service_icons/catering.svg",
+      "bytes": 253
+    },
+    {
+      "path": "02_service_icons/close-protection.svg",
+      "bytes": 348
+    },
+    {
+      "path": "02_service_icons/fuel.svg",
+      "bytes": 319
+    },
+    {
+      "path": "02_service_icons/ground-transport.svg",
+      "bytes": 485
+    },
+    {
+      "path": "02_service_icons/hangar.svg",
+      "bytes": 270
+    },
+    {
+      "path": "02_service_icons/hotel.svg",
+      "bytes": 280
+    },
+    {
+      "path": "03_aviation_icons/aircraft-tail.svg",
+      "bytes": 235
+    },
+    {
+      "path": "03_aviation_icons/airport.svg",
+      "bytes": 256
+    },
+    {
+      "path": "03_aviation_icons/arrival.svg",
+      "bytes": 246
+    },
+    {
+      "path": "03_aviation_icons/crew.svg",
+      "bytes": 274
+    },
+    {
+      "path": "03_aviation_icons/departure.svg",
+      "bytes": 247
+    },
+    {
+      "path": "03_aviation_icons/fbo.svg",
+      "bytes": 276
+    },
+    {
+      "path": "03_aviation_icons/luggage.svg",
+      "bytes": 304
+    },
+    {
+      "path": "03_aviation_icons/passengers.svg",
+      "bytes": 333
+    },
+    {
+      "path": "03_aviation_icons/private-jet.svg",
+      "bytes": 278
+    },
+    {
+      "path": "03_aviation_icons/runway.svg",
+      "bytes": 255
+    },
+    {
+      "path": "04_ui_domain_icons/ai-research.svg",
+      "bytes": 257
+    },
+    {
+      "path": "04_ui_domain_icons/assignment.svg",
+      "bytes": 252
+    },
+    {
+      "path": "04_ui_domain_icons/audit.svg",
+      "bytes": 253
+    },
+    {
+      "path": "04_ui_domain_icons/coverage.svg",
+      "bytes": 301
+    },
+    {
+      "path": "04_ui_domain_icons/decision-trace.svg",
+      "bytes": 323
+    },
+    {
+      "path": "04_ui_domain_icons/operations.svg",
+      "bytes": 278
+    },
+    {
+      "path": "04_ui_domain_icons/override.svg",
+      "bytes": 255
+    },
+    {
+      "path": "04_ui_domain_icons/provider-company.svg",
+      "bytes": 262
+    },
+    {
+      "path": "04_ui_domain_icons/resource.svg",
+      "bytes": 245
+    },
+    {
+      "path": "04_ui_domain_icons/sla-clock.svg",
+      "bytes": 262
+    },
+    {
+      "path": "05_backgrounds/admin-sidebar.webp",
+      "bytes": 27472
+    },
+    {
+      "path": "05_backgrounds/client-hero.webp",
+      "bytes": 89964
+    },
+    {
+      "path": "05_backgrounds/login-auth.webp",
+      "bytes": 104326
+    },
+    {
+      "path": "05_backgrounds/ops-sidebar.webp",
+      "bytes": 33040
+    },
+    {
+      "path": "05_backgrounds/pattern-dark.svg",
+      "bytes": 835
+    },
+    {
+      "path": "05_backgrounds/pattern-light.svg",
+      "bytes": 743
+    },
+    {
+      "path": "05_backgrounds/provider-sidebar.webp",
+      "bytes": 54634
+    },
+    {
+      "path": "06_service_images/catering.svg",
+      "bytes": 2202
+    },
+    {
+      "path": "06_service_images/catering.webp",
+      "bytes": 27844
+    },
+    {
+      "path": "06_service_images/close-protection.svg",
+      "bytes": 4991
+    },
+    {
+      "path": "06_service_images/close-protection.webp",
+      "bytes": 35476
+    },
+    {
+      "path": "06_service_images/fuel.svg",
+      "bytes": 4938
+    },
+    {
+      "path": "06_service_images/fuel.webp",
+      "bytes": 35484
+    },
+    {
+      "path": "06_service_images/ground-transport.svg",
+      "bytes": 4955
+    },
+    {
+      "path": "06_service_images/ground-transport.webp",
+      "bytes": 33936
+    },
+    {
+      "path": "06_service_images/hangar.svg",
+      "bytes": 4528
+    },
+    {
+      "path": "06_service_images/hangar.webp",
+      "bytes": 34712
+    },
+    {
+      "path": "06_service_images/hotel.svg",
+      "bytes": 2065
+    },
+    {
+      "path": "06_service_images/hotel.webp",
+      "bytes": 21894
+    },
+    {
+      "path": "07_location_placeholders/generic-apron-day.svg",
+      "bytes": 823
+    },
+    {
+      "path": "07_location_placeholders/generic-apron-day.webp",
+      "bytes": 8938
+    },
+    {
+      "path": "07_location_placeholders/generic-fbo-terminal.svg",
+      "bytes": 823
+    },
+    {
+      "path": "07_location_placeholders/generic-fbo-terminal.webp",
+      "bytes": 8458
+    },
+    {
+      "path": "07_location_placeholders/generic-hangar-exterior.svg",
+      "bytes": 823
+    },
+    {
+      "path": "07_location_placeholders/generic-hangar-exterior.webp",
+      "bytes": 8734
+    },
+    {
+      "path": "07_location_placeholders/generic-runway-evening.svg",
+      "bytes": 823
+    },
+    {
+      "path": "07_location_placeholders/generic-runway-evening.webp",
+      "bytes": 9936
+    },
+    {
+      "path": "08_provider_placeholders/provider-placeholder-building.svg",
+      "bytes": 309
+    },
+    {
+      "path": "08_provider_placeholders/provider-placeholder-shield.svg",
+      "bytes": 303
+    },
+    {
+      "path": "08_provider_placeholders/provider-placeholder-wing.svg",
+      "bytes": 241
+    },
+    {
+      "path": "09_illustrations/empty-state.svg",
+      "bytes": 404
+    },
+    {
+      "path": "09_illustrations/error.svg",
+      "bytes": 265
+    },
+    {
+      "path": "09_illustrations/global-network.svg",
+      "bytes": 534
+    },
+    {
+      "path": "09_illustrations/no-data.svg",
+      "bytes": 516
+    },
+    {
+      "path": "09_illustrations/secure.svg",
+      "bytes": 323
+    },
+    {
+      "path": "09_illustrations/success.svg",
+      "bytes": 296
+    },
+    {
+      "path": "10_misc/actual-pack-preview.png",
+      "bytes": 352516
+    },
+    {
+      "path": "10_misc/aircraft-silhouette.svg",
+      "bytes": 247
+    },
+    {
+      "path": "10_misc/asset-pack-preview.png",
+      "bytes": 2033907
+    },
+    {
+      "path": "10_misc/avatar-initials-blue.svg",
+      "bytes": 258
+    },
+    {
+      "path": "10_misc/avatar-initials-gold.svg",
+      "bytes": 258
+    },
+    {
+      "path": "10_misc/avatar-initials-navy.svg",
+      "bytes": 258
+    },
+    {
+      "path": "10_misc/ui-reference.png",
+      "bytes": 2493967
+    },
+    {
+      "path": "10_misc/world-map-abstract.svg",
+      "bytes": 663
+    },
+    {
+      "path": "ASSET_LICENSES.md",
+      "bytes": 778
+    },
+    {
+      "path": "ASSET_REGISTRY.example.ts",
+      "bytes": 994
+    },
+    {
+      "path": "ASSET_USE_MAP.md",
+      "bytes": 2400
+    }
+  ]
+}

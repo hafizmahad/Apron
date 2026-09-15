@@ -1,0 +1,21 @@
+# The repository builds Linux container images and is edited on Windows. Text files are
+# stored and checked out with LF everywhere so a shell script, a SQL migration or a
+# Dockerfile cannot arrive in the image with CRLF line endings.
+* text=auto eol=lf
+
+# Binary: never normalised, never diffed as text.
+*.png    binary
+*.jpg    binary
+*.jpeg   binary
+*.webp   binary
+*.ico    binary
+*.woff   binary
+*.woff2  binary
+*.ttf    binary
+*.otf    binary
+*.pdf    binary
+*.docx   binary
+*.xlsx   binary
+
+# Generated: collapsed in pull request diffs, still versioned.
+package-lock.json linguist-generated=true -diff

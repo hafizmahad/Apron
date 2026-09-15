@@ -1,0 +1,23 @@
+<!--
+  Apron-authored addition to the supplied pack.
+
+  The supplied `apron-mark.svg` paints its feather layers in a fixed #0F2238, which makes
+  the mark almost invisible on the navy sidebar and on the navy app icon. This variant is
+  geometrically identical to the supplied mark but paints the feather in `currentColor`,
+  so it inherits the surrounding design token: navy on light surfaces, warm off-white on
+  the sidebar. The gold leading wing keeps the pack's original gradient.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 90" fill="none" role="img">
+  <defs>
+    <linearGradient id="apron-mark-gold" x1="15" y1="15" x2="100" y2="80" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#E0BF86" />
+      <stop offset="1" stop-color="#C7A56A" />
+    </linearGradient>
+  </defs>
+  <path d="M56 15 102 6 72 30 56 34Z" fill="url(#apron-mark-gold)" />
+  <path d="M53 22 19 14 45 37 56 40Z" fill="currentColor" />
+  <path d="M49 35 11 31 41 48 55 47Z" fill="currentColor" opacity=".92" />
+  <path d="M48 48 17 48 43 59 57 54Z" fill="currentColor" opacity=".82" />
+  <path d="M52 59 29 66 56 68 68 58Z" fill="currentColor" opacity=".7" />
+  <path d="M57 35 71 30 65 71 56 82 51 69Z" fill="url(#apron-mark-gold)" />
+</svg>

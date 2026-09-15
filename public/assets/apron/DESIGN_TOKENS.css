@@ -1,0 +1,19 @@
+:root {
+  --apron-canvas: #F7F4EF;
+  --apron-surface: #FFFFFF;
+  --apron-sidebar: #0F2238;
+  --apron-sidebar-soft: #173451;
+  --apron-text: #0D1A2A;
+  --apron-text-muted: #61758A;
+  --apron-border: #E7EDF3;
+  --apron-accent: #8B2136;
+  --apron-accent-hover: #A72A45;
+  --apron-gold: #C7A56A;
+  --apron-success: #1D8A68;
+  --apron-warning: #D7983A;
+  --apron-danger: #C84B4B;
+  --apron-radius-sm: 10px;
+  --apron-radius-md: 14px;
+  --apron-radius-lg: 20px;
+  --apron-shadow-soft: 0 12px 40px rgba(15,34,56,.08);
+}
