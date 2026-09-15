@@ -72,9 +72,16 @@ describe('the production image cannot depend on a devDependency', () => {
 describe('the container is not asked for pretty logs', () => {
   const compose = read('docker-compose.yml');
 
-  it('defaults LOG_PRETTY to false for the image', () => {
+  it('pins LOG_PRETTY to false rather than inheriting it', () => {
     // Belt and braces alongside the fallback: a production container has no terminal to
     // pretty-print for, and its stdout is read by a log collector that wants JSON.
-    expect(compose).toMatch(/LOG_PRETTY:\s*\$\{LOG_PRETTY:-false\}/);
+    //
+    // A literal, not `${LOG_PRETTY:-false}`. Compose fills ${VAR} from .env, where a
+    // developer reasonably sets LOG_PRETTY=true for `npm run dev` — the default form only
+    // applies when the variable is *unset*, so that setting followed them straight into a
+    // container the transport is absent from. Pinning closes the hole the default left.
+    const assigned = compose.match(/^\s*LOG_PRETTY:\s*(.+?)\s*$/m)?.[1];
+    expect(assigned).toBeDefined();
+    expect(assigned).toMatch(/^"?false"?$/);
   });
 });

@@ -176,17 +176,29 @@ docker compose logs -f web worker
 docker compose logs web | grep '"level":"error"'
 ```
 
-`LOG_PRETTY=true` asks for human-readable output. `pino-pretty` is a devDependency and is
-**not** in the production image, so the logger catches that and falls back to JSON with a
-warning rather than crashing:
+`LOG_PRETTY=true` asks for human-readable output, and it works in exactly one place:
+
+| Where | `pino-pretty` present? |
+| --- | --- |
+| `npm run dev`, and the `tsx` scripts | yes |
+| The standalone build (`npm run build`) | **no** |
+| The container | **no** |
+
+It is a devDependency, and neither the standalone output nor the production image carries
+one. So `LOG_PRETTY=true` in either of those produces a warning on every boot and JSON
+anyway:
 
 ```
 LOG_PRETTY is set but pino-pretty is not installed — falling back to JSON logs
 ```
 
-That fallback exists because the crash it replaces took down every server action in the
-container while the same code worked perfectly outside it. Leave `LOG_PRETTY` unset in a
-deployed environment.
+The fallback exists because the crash it replaced took down **every server action** in the
+container while the same code worked perfectly outside it. It is a safety net, not the fix.
+
+The fix is not to set it where it cannot work. `docker-compose.yml` pins `LOG_PRETTY: "false"`
+rather than inheriting it, because Compose fills `${VAR}` from `.env` — where a developer
+reasonably sets it for the dev server — and that setting would otherwise follow them into a
+container. Leave it false in any deployed environment: JSON is what a log aggregator reads.
 
 ---
 

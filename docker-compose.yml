@@ -28,7 +28,12 @@ x-app-env: &app-env
   SMTP_SECURE: false
   MAIL_FROM: Apron Operations <ops@apron.local>
   LOG_LEVEL: ${LOG_LEVEL:-info}
-  LOG_PRETTY: ${LOG_PRETTY:-false}
+  # Pinned, not inherited. `pino-pretty` is a devDependency and is absent from the image,
+  # so `true` can only ever produce a warning and a fallback. Compose fills ${VAR} from
+  # .env, where a developer reasonably sets it for `npm run dev` — this stops that setting
+  # following them into a container it cannot work in. JSON is the right format here anyway:
+  # it is what a log aggregator can read.
+  LOG_PRETTY: "false"
   DOCUMENT_STORAGE_DRIVER: filesystem
   DOCUMENT_STORAGE_PATH: /app/.apron-storage
 
