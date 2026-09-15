@@ -17,10 +17,19 @@ const root = dirname(dirname(fileURLToPath(import.meta.url)));
 await build({
   // Object form so the seed entry lands at `dist-worker/seed.js` rather than
   // `dist-worker/index.js`, which is what `docker-compose.yml` invokes.
+  // The verification scripts are bundled alongside the worker for one reason: they need
+  // the database as well as HTTP. They read seeded row counts, sign in through
+  // `attemptLogin` and revoke the session afterwards — which is what makes them worth
+  // more than a curl — and a deployed database sits in a private subnet where neither a
+  // laptop nor a CI runner can reach it. Bundled, they run as a one-off task inside the
+  // VPC against the public URL, which is the only place they can tell the whole truth.
   entryPoints: {
     worker: join(root, 'src/jobs/worker.ts'),
     migrate: join(root, 'src/db/migrate.ts'),
     seed: join(root, 'src/db/seed/index.ts'),
+    smoke: join(root, 'scripts/smoke.ts'),
+    'verify-rbac': join(root, 'scripts/verify-rbac.ts'),
+    'verify-routing': join(root, 'scripts/verify-routing.ts'),
   },
   outdir: join(root, 'dist-worker'),
   bundle: true,

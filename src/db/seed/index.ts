@@ -48,8 +48,15 @@ import { seedClientOrganizations, seedUsers } from './reference/tenants';
 /** The fallback, used when `SEED_PASSWORD` is unset. Well known, and only ever local. */
 const DEV_PASSWORD = 'Apron!Dev2026';
 
-/** One password for every seeded account, so nothing has to be rotated per user. */
-function seedPassword(): { readonly value: string; readonly isDefault: boolean } {
+/**
+ * One password for every seeded account, so nothing has to be rotated per user.
+ *
+ * Exported because the verification scripts have to sign in as those accounts, and a
+ * second copy of this rule would pass locally and fail against any environment that set
+ * SEED_PASSWORD — the divergence being that the seed wrote one password and the check
+ * tried another.
+ */
+export function seedPassword(): { readonly value: string; readonly isDefault: boolean } {
   const configured = getEnv().SEED_PASSWORD;
   return configured === undefined
     ? { value: DEV_PASSWORD, isDefault: true }

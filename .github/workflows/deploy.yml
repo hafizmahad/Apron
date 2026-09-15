@@ -1,0 +1,204 @@
+# Apron Production — deployment.
+#
+# Auto-deploys a green `main`. There is one environment (CLAUDE.md §3), so a merge to main
+# is the release, and `ci.yml` is what stands between a change and it.
+#
+# No AWS access key exists anywhere. The role is assumed through GitHub's OIDC provider,
+# and its trust policy names this repository and this branch — a fork, or a pull request
+# from one, produces a token that cannot assume it.
+#
+# The last step is the point: the deployment is verified against the thing it deployed to.
+# A check that passed on a developer's machine proves nothing about the cluster.
+
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Never two deployments at once. A queued one waits rather than racing the service update
+# of the one before it; `cancel-in-progress: false` because abandoning a deploy halfway
+# leaves the cluster in a state nobody chose.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  id-token: write # assume the role
+  contents: read
+
+env:
+  AWS_REGION: us-east-2
+  ECR_REGISTRY: 533267167718.dkr.ecr.us-east-2.amazonaws.com
+  ECS_CLUSTER: apron-cluster
+
+jobs:
+  deploy:
+    name: Build, migrate, deploy, verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Assume the deploy role
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Log in to ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - uses: docker/setup-buildx-action@v3
+
+      # Tagged with the commit SHA, and the repositories are IMMUTABLE, so "which code is
+      # running" is answerable from the tag alone — the most useful property there is
+      # during an incident.
+      #
+      # provenance=false because ECR rejects the attestation manifest Buildx attaches by
+      # default. linux/amd64 because the Fargate tasks are x86.
+      - name: Build and push web
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: web
+          platforms: linux/amd64
+          provenance: false
+          push: true
+          tags: ${{ env.ECR_REGISTRY }}/apron/web:${{ github.sha }}
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,mode=max,scope=web
+
+      - name: Build and push worker
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: worker
+          platforms: linux/amd64
+          provenance: false
+          push: true
+          tags: ${{ env.ECR_REGISTRY }}/apron/worker:${{ github.sha }}
+          cache-from: type=gha,scope=worker
+          cache-to: type=gha,mode=max,scope=worker
+
+      # Each family's current definition is read back and re-registered with only the
+      # image changed. Everything else — the secrets, the environment, the roles — stays
+      # exactly as Terraform declared it, so the pipeline cannot drift the configuration.
+      - name: Register new task definitions
+        id: taskdefs
+        run: |
+          set -euo pipefail
+          for family in apron-web apron-worker apron-admin; do
+            case "$family" in
+              apron-web) image="$ECR_REGISTRY/apron/web:${{ github.sha }}" ;;
+              *)         image="$ECR_REGISTRY/apron/worker:${{ github.sha }}" ;;
+            esac
+
+            aws ecs describe-task-definition --task-definition "$family" \
+              --query taskDefinition > current.json
+
+            jq --arg image "$image" '
+              .containerDefinitions[0].image = $image
+              | del(.taskDefinitionArn, .revision, .status, .requiresAttributes,
+                    .compatibilities, .registeredAt, .registeredBy)
+            ' current.json > next.json
+
+            arn=$(aws ecs register-task-definition --cli-input-json file://next.json \
+              --query 'taskDefinition.taskDefinitionArn' --output text)
+            echo "${family}=${arn}" >> "$GITHUB_OUTPUT"
+            echo "registered $arn"
+          done
+
+      # Before the services, and the deployment stops here if it fails. Migrations are
+      # applied in filename order, each in its own transaction, recorded with a checksum;
+      # running twice applies nothing.
+      - name: Apply migrations
+        run: |
+          set -euo pipefail
+          subnets=$(aws ec2 describe-subnets \
+            --filters 'Name=tag:Name,Values=apron-private-*' \
+            --query 'Subnets[].SubnetId' --output text | tr '\t' ',')
+          sg=$(aws ec2 describe-security-groups \
+            --filters 'Name=group-name,Values=apron-tasks' \
+            --query 'SecurityGroups[0].GroupId' --output text)
+
+          arn=$(aws ecs run-task \
+            --cluster "$ECS_CLUSTER" --launch-type FARGATE \
+            --task-definition '${{ steps.taskdefs.outputs.apron-admin }}' \
+            --network-configuration "awsvpcConfiguration={subnets=[$subnets],securityGroups=[$sg],assignPublicIp=DISABLED}" \
+            --overrides '{"containerOverrides":[{"name":"admin","command":["node","dist-worker/migrate.js"]}]}' \
+            --query 'tasks[0].taskArn' --output text)
+
+          echo "migration task $arn"
+          aws ecs wait tasks-stopped --cluster "$ECS_CLUSTER" --tasks "$arn"
+
+          code=$(aws ecs describe-tasks --cluster "$ECS_CLUSTER" --tasks "$arn" \
+            --query 'tasks[0].containers[0].exitCode' --output text)
+          reason=$(aws ecs describe-tasks --cluster "$ECS_CLUSTER" --tasks "$arn" \
+            --query 'tasks[0].stoppedReason' --output text)
+
+          echo "exit code: $code ($reason)"
+          if [ "$code" != "0" ]; then
+            echo "::error::Migrations failed. Services were not updated."
+            exit 1
+          fi
+
+      - name: Update services
+        run: |
+          set -euo pipefail
+          aws ecs update-service --cluster "$ECS_CLUSTER" --service apron-web \
+            --task-definition '${{ steps.taskdefs.outputs.apron-web }}' >/dev/null
+          aws ecs update-service --cluster "$ECS_CLUSTER" --service apron-worker \
+            --task-definition '${{ steps.taskdefs.outputs.apron-worker }}' >/dev/null
+
+          # Both services have a deployment circuit breaker with rollback, so a failing
+          # deployment reverts itself; this waits to find out which happened.
+          aws ecs wait services-stable --cluster "$ECS_CLUSTER" \
+            --services apron-web apron-worker
+
+      # Run inside the VPC, not on this runner.
+      #
+      # These check more than a curl can: they read seeded row counts, sign in as real
+      # accounts through `attemptLogin` and revoke the session afterwards. That needs the
+      # database as well as HTTP, and the database is in a private subnet no runner can
+      # reach. Bundled into the same image as one-off tasks, they run where both are
+      # reachable, against APP_URL — the public origin, which the task definition already
+      # carries, so nothing has to be passed in and pointed at the wrong host.
+      - name: Verify the deployment
+        run: |
+          set -euo pipefail
+          subnets=$(aws ec2 describe-subnets \
+            --filters 'Name=tag:Name,Values=apron-private-*' \
+            --query 'Subnets[].SubnetId' --output text | tr '\t' ',')
+          sg=$(aws ec2 describe-security-groups \
+            --filters 'Name=group-name,Values=apron-tasks' \
+            --query 'SecurityGroups[0].GroupId' --output text)
+          net="awsvpcConfiguration={subnets=[$subnets],securityGroups=[$sg],assignPublicIp=DISABLED}"
+
+          failed=0
+          for script in smoke verify-routing verify-rbac; do
+            arn=$(aws ecs run-task \
+              --cluster "$ECS_CLUSTER" --launch-type FARGATE \
+              --task-definition '${{ steps.taskdefs.outputs.apron-admin }}' \
+              --network-configuration "$net" \
+              --overrides "{\"containerOverrides\":[{\"name\":\"admin\",\"command\":[\"node\",\"dist-worker/$script.js\"]}]}" \
+              --query 'tasks[0].taskArn' --output text)
+
+            aws ecs wait tasks-stopped --cluster "$ECS_CLUSTER" --tasks "$arn"
+            code=$(aws ecs describe-tasks --cluster "$ECS_CLUSTER" --tasks "$arn" \
+              --query 'tasks[0].containers[0].exitCode' --output text)
+
+            # The output is the report; print it whether it passed or failed.
+            aws logs get-log-events --log-group-name /ecs/apron-tasks \
+              --log-stream-name "admin/admin/${arn##*/}" --start-from-head \
+              --query 'events[].message' --output text | tr '\t' '\n'
+
+            if [ "$code" != "0" ]; then
+              echo "::error::$script failed against the deployed environment (exit $code)"
+              failed=1
+            fi
+          done
+
+          [ "$failed" -eq 0 ]

@@ -4,6 +4,7 @@ import { revokeSession } from '@/auth/session';
 import { getDb } from '@/db/client';
 import { sql } from 'drizzle-orm';
 import { getEnv, isAiEnabled } from '@/lib/config/env';
+import { seedPassword } from '@/db/seed';
 
 /**
  * The local production smoke test (CLAUDE.md §31 Phase 12, §34).
@@ -23,7 +24,14 @@ import { getEnv, isAiEnabled } from '@/lib/config/env';
  *   BASE=http://127.0.0.1:53000 npm run smoke
  */
 
-const BASE = (process.env['BASE'] ?? 'http://127.0.0.1:3001').replace(/\/$/, '');
+// BASE, then APP_URL, then the local standalone port. APP_URL is what the deployed
+// environment already sets to its public origin, so running this as a one-off task in
+// the VPC needs nothing passed to it — and pointing a check at the wrong host is a
+// mistake that reports success about a server nobody uses.
+const BASE = (process.env['BASE'] ?? process.env['APP_URL'] ?? 'http://127.0.0.1:3001').replace(
+  /\/$/,
+  '',
+);
 const TIMEOUT_MS = Number(process.env['SMOKE_TIMEOUT_MS'] ?? 15_000);
 
 let failures = 0;
@@ -117,7 +125,8 @@ report(
 // that can be wrong in a way nothing else notices until a person tries to log in.
 const env = getEnv();
 const email = process.env['SMOKE_EMAIL'] ?? 'ops.manager@apron.local';
-const password = process.env['SMOKE_PASSWORD'] ?? 'Apron!Dev2026';
+// Whatever the seed used. SMOKE_PASSWORD still overrides, for a database seeded by hand.
+const password = process.env['SMOKE_PASSWORD'] ?? seedPassword().value;
 
 const login = await attemptLogin({ email, password, ipAddress: null, userAgent: 'smoke' });
 report('sign-in works', login.kind === 'ok', login.kind === 'ok' ? email : `refused: ${login.kind}`);

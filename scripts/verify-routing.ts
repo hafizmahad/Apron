@@ -6,6 +6,7 @@ import { attemptLogin } from '@/auth/login';
 import { revokeSession } from '@/auth/session';
 import { homePortal, type Actor } from '@/domain/permissions';
 import { getEnv } from '@/lib/config/env';
+import { seedPassword } from '@/db/seed';
 
 /**
  * Exhaustive routing and navigation verification against a RUNNING build.
@@ -25,8 +26,13 @@ import { getEnv } from '@/lib/config/env';
  *   BASE=http://localhost:53000 npm run verify:routing
  */
 
-const BASE = process.env['BASE'] ?? 'http://127.0.0.1:3001';
-const PASSWORD = 'Apron!Dev2026';
+// BASE, then APP_URL, then the local standalone port. APP_URL is what the deployed
+// environment already sets to its public origin, so running this as a one-off task in
+// the VPC needs nothing passed to it — and pointing a check at the wrong host is a
+// mistake that reports success about a server nobody uses.
+const BASE = (process.env['BASE'] ?? process.env['APP_URL'] ?? 'http://127.0.0.1:3001').replace(/\/$/, '');
+// Whatever the seed used, so this works against a deployed environment too.
+const PASSWORD = seedPassword().value;
 const PORTALS = ['/ops', '/provider', '/admin', '/client'] as const;
 
 let failures = 0;
