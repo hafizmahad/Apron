@@ -589,3 +589,57 @@ export const seedHangars: readonly SeedHangar[] = [
   { providerSlug: 'palm-coast-hangar', airportIcao: 'KPBI', name: 'Palm Coast Bay 2', doorWidthFt: '90.00', doorHeightFt: '26.00', floorLengthFt: '95.00', floorWidthFt: '100.00', maxAircraftWeightLbs: 75000, heated: false, timezoneIana: 'America/New_York' },
   { providerSlug: 'palm-coast-hangar', airportIcao: 'KOPF', name: 'Palm Coast Opa-locka Bay', doorWidthFt: '105.00', doorHeightFt: '27.00', floorLengthFt: '115.00', floorWidthFt: '115.00', maxAircraftWeightLbs: 85000, heated: false, timezoneIana: 'America/New_York' },
 ];
+
+/**
+ * Provider blackout windows.
+ *
+ * The docstring at the top of this file has always claimed the network contains "a
+ * provider with a blackout window". It did not: `provider_blackouts` seeded empty while
+ * `eligibility.ts` carried a fully implemented `blackout_window` rejection, so the only
+ * thing exercising that branch was its unit test.
+ *
+ * Unlike desk hours, which are weekday-based and therefore timeless, a blackout is an
+ * absolute interval. These are anchored to the seed run rather than to a fixed calendar
+ * date, so they stay meaningful however long after the build the seed is loaded.
+ *
+ * They open three weeks out on purpose. The scenario requests (`npm run db:scenarios`)
+ * and the integration suites work within the next few days, and a blackout that silently
+ * changed which provider won those would be a seed quietly rewriting test expectations.
+ * Far enough out to be inert, real enough to render in the provider and admin portals and
+ * to reject a genuine request aimed at that window.
+ */
+export interface SeedBlackout {
+  readonly providerSlug: string;
+  /**
+   * Narrows the blackout to one coverage row. Both must be given together; omitting them
+   * makes it company-wide, which is the `coverage_id is null` case in the schema.
+   */
+  readonly serviceCode?: string;
+  readonly airportIcao?: string;
+  /** Whole days after the seed date on which the window opens, at 00:00 UTC. */
+  readonly startsInDays: number;
+  readonly durationHours: number;
+  readonly reason: string;
+}
+
+export const seedBlackouts: readonly SeedBlackout[] = [
+  // Coverage-scoped: Gotham keeps its other coverage, loses Teterboro ground transport
+  // for two days. KTEB ground transport is the one place three approved companies
+  // overlap, so this is where losing one candidate actually changes the ranking.
+  {
+    providerSlug: 'gotham-livery-partners',
+    serviceCode: 'ground_transport',
+    airportIcao: 'KTEB',
+    startsInDays: 21,
+    durationHours: 48,
+    reason: 'Fleet recertification — Teterboro ground transport unavailable.',
+  },
+  // Company-wide: no coverage row, so every service and every airport this company
+  // covers is blacked out. Exercises the `coverage_id is null` branch.
+  {
+    providerSlug: 'praetorian-protective',
+    startsInDays: 24,
+    durationHours: 24,
+    reason: 'Annual firearms requalification — all details stood down.',
+  },
+];

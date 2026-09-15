@@ -11,6 +11,7 @@ import {
   seedServiceCategories,
 } from './reference/catalogue';
 import {
+  seedBlackouts,
   seedCatering,
   seedCoverage,
   seedDrivers,
@@ -390,6 +391,9 @@ export async function runSeed(
 
     // --- coverage ----------------------------------------------------------
     let coverageRows = 0;
+    // Blackouts that name a service and airport attach to the coverage row they narrow,
+    // so the ids are kept as the rows are written rather than looked up again after.
+    const coverageIdByKey = new Map<string, string>();
     for (const coverage of seedCoverage) {
       const providerCompanyId = requireProvider(coverage.providerSlug);
       const serviceCategoryId = requireService(coverage.serviceCode);
@@ -454,10 +458,58 @@ export async function runSeed(
           })),
         );
       }
+      coverageIdByKey.set(
+        `${coverage.providerSlug}::${coverage.serviceCode}::${coverage.airportIcao}`,
+        coverageId,
+      );
       coverageRows += 1;
     }
     counts['provider_coverage'] = coverageRows;
     log(`coverage: ${coverageRows} provider/service/location rows`);
+
+    // --- blackouts ---------------------------------------------------------
+    // Keyed on provider plus reason so re-seeding replaces its own rows and leaves a
+    // blackout entered by a provider through the portal alone.
+    let blackoutRows = 0;
+    const seedDay = new Date();
+    const seedMidnightUtc = Date.UTC(
+      seedDay.getUTCFullYear(),
+      seedDay.getUTCMonth(),
+      seedDay.getUTCDate(),
+    );
+    for (const blackout of seedBlackouts) {
+      const providerCompanyId = requireProvider(blackout.providerSlug);
+
+      let coverageId: string | null = null;
+      if (blackout.serviceCode !== undefined && blackout.airportIcao !== undefined) {
+        const key = `${blackout.providerSlug}::${blackout.serviceCode}::${blackout.airportIcao}`;
+        const found = coverageIdByKey.get(key);
+        if (found === undefined) {
+          throw new Error(`Seed blackout references coverage that is not seeded: ${key}`);
+        }
+        coverageId = found;
+      }
+
+      const startsAt = new Date(seedMidnightUtc + blackout.startsInDays * 86_400_000);
+      const endsAt = new Date(startsAt.getTime() + blackout.durationHours * 3_600_000);
+
+      await tx
+        .delete(schema.providerBlackouts)
+        .where(
+          sql`${schema.providerBlackouts.providerCompanyId} = ${providerCompanyId}
+              and ${schema.providerBlackouts.reason} = ${blackout.reason}`,
+        );
+      await tx.insert(schema.providerBlackouts).values({
+        providerCompanyId,
+        coverageId,
+        startsAt,
+        endsAt,
+        reason: blackout.reason,
+      });
+      blackoutRows += 1;
+    }
+    counts['provider_blackouts'] = blackoutRows;
+    log(`blackouts: ${blackoutRows} provider windows`);
 
     // --- vehicles ----------------------------------------------------------
     for (const vehicle of seedVehicles) {
@@ -729,6 +781,7 @@ export async function countSeededRows(): Promise<SeedSummary> {
     'provider_companies',
     'users',
     'provider_coverage',
+    'provider_blackouts',
     'vehicles',
     'drivers',
     'security_officers',
