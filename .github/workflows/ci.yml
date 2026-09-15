@@ -1,0 +1,167 @@
+# Apron Production — continuous integration.
+#
+# Mirrors the quality gates in CLAUDE.md §34. There is deliberately no screenshot, video,
+# visual-regression or recorded-browser job: CLAUDE.md forbids them, and correctness here
+# comes from deterministic domain tests, integration tests against a real PostgreSQL,
+# route contract tests, RBAC tests and offline AI evals.
+
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# A newer push to the same branch makes the older run irrelevant. Cancel it rather than
+# paying for both — except on main, where every commit's result is worth recording.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: '22'
+  NEXT_TELEMETRY_DISABLED: '1'
+
+jobs:
+  static:
+    name: Lint and types
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+
+  unit:
+    name: Unit tests and AI evals
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      # Pure and hermetic — no database, no Redis, no network.
+      - name: Unit tests
+        run: npm test
+      # Offline against the scripted AI adapter (CLAUDE.md §26). No key, no calls.
+      - name: AI evals
+        run: npm run test:evals
+
+  integration:
+    name: Integration and contract tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    # The same versions the Compose stack runs, so a failure here is a real failure and
+    # not a version difference between CI and the machine the product was built on.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: apron
+          POSTGRES_PASSWORD: apron_ci
+          POSTGRES_DB: apron_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U apron -d apron_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      # The suite refuses to run unless the database name marks it as disposable; it
+      # applies the migrations itself before the first test.
+      TEST_DATABASE_URL: postgres://apron:apron_ci@localhost:5432/apron_test
+      TEST_REDIS_URL: redis://localhost:6379/15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - name: Integration tests
+        run: npm run test:integration
+      - name: Route contract tests
+        run: npm run test:contracts
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      # Placeholders satisfy boot-time env validation during the static build only. They
+      # are the same values the Dockerfile uses and reach no running container.
+      - name: Build web and worker
+        env:
+          NODE_ENV: production
+          DATABASE_URL: postgres://build:build@localhost:5432/build
+          REDIS_URL: redis://localhost:6379
+          SESSION_SECRET: build-time-placeholder-not-used-at-runtime-000
+          AI_ENABLED: 'false'
+        run: npm run build:all
+      # Next's standalone output omits .next/static and public/; prepare-standalone.mjs
+      # copies them in. A deployment missing this serves a working API and an unstyled
+      # page — healthy in logs, broken to a user. Fail here instead.
+      - name: Assert standalone output is complete
+        run: |
+          test -f .next/standalone/server.js
+          test -d .next/standalone/.next/static
+          test -d .next/standalone/public
+          test -f dist-worker/worker.js
+          test -f dist-worker/migrate.js
+          test -f dist-worker/seed.js
+
+  image:
+    name: Container images
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      # Both targets are built, because the worker is not optional: it owns
+      # acknowledgement-SLA expiry, re-matching, notification delivery and document
+      # generation. A green web image alone is not a deployable stack.
+      - name: Build web image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: web
+          push: false
+          load: true
+          tags: apron-web:${{ github.sha }}
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,mode=max,scope=web
+      - name: Build worker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: worker
+          push: false
+          load: true
+          tags: apron-worker:${{ github.sha }}
+          cache-from: type=gha,scope=worker
+          cache-to: type=gha,mode=max,scope=worker

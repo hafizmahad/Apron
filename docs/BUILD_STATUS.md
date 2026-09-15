@@ -6,7 +6,7 @@ Updated continuously. Phase numbering follows `CLAUDE.md` §31.
 
 ## Current position
 
-**Phase 12 — local production rehearsal** — complete. **Phase 13 — AWS** is next and needs explicit approval.
+**Phase 13 — GitHub, CI/CD and AWS** — in progress. Phases 0-12 are complete.
 Phases 0-11 are complete, plus the click-through wiring and the gaps found in review.
 
 Latest gate run (Phase 11): lint 0 problems · typecheck clean · **413 unit tests** ·
@@ -1768,3 +1768,106 @@ cost an hour earlier in this build.
 | `npm run smoke` (native) | **pass** — 15/15 |
 | `npm run smoke` (container) | **pass** — 15/15 |
 | Full verification chain, both runtimes | **pass** — 8/8 each |
+
+---
+
+## Phase 13 — GitHub, CI/CD and AWS
+
+In progress. Started **2026-09-15**, immediately after the Phase 12 gates above.
+
+### What the repository looked like at the start
+
+Worth recording, because it was not what the handoff implied: the working tree held the
+entire Phases 0-12 build and **git held nothing**. No commits, no remote, no `.github/`,
+no `infra/`. Everything below is the first history this project has.
+
+### Decisions taken
+
+| Question | Decision |
+| --- | --- |
+| AWS account | **Its own account**, not the shared one. See below. |
+| Deploy trigger | **Auto-deploy on a green `main`.** No manual approval gate. |
+| First commit | **One initial commit** for Phases 0-12 rather than reconstructed per-phase history. |
+| `apron-production-assets/` | **Untracked.** Its contents are committed under `public/assets/apron/`, which is what the application serves (CLAUDE.md §21). |
+| Default branch | Renamed `master` → `main`. |
+
+### Why a dedicated AWS account
+
+The credentials on the build machine belong to account `131880217305` as
+`iam::131880217305:user/vesper-deploy`. That account already runs three unrelated products —
+ECS clusters `vesper-cluster`, `neuroreach-ai-cluster` and `sleepreach-cluster`, matching ECR
+namespaces, and a `neuroreach-ai-vpc` alongside the default.
+
+The identity carries an explicit-deny policy, `vesper-guardrail`, that refuses destructive and
+modifying calls on every resource **not** named `vesper-*`. It also denies `sso:ListInstances`
+and `organizations:DescribeOrganization` outright.
+
+Two consequences, both factual rather than preference:
+
+1. **These credentials cannot provision Apron**, and cannot be made to by editing Terraform.
+2. **Whether IAM Identity Center is enabled cannot be determined from this machine.** It needs
+   an identity with Organization-management access.
+
+The guardrail is a sound pattern and a dedicated account achieves the same isolation without
+needing a second copy of it. If the decision is ever reversed, Apron follows the same
+convention: `apron-*` resources, an `apron/` ECR namespace, an `apron/` secrets prefix and an
+`apron-guardrail` denying destruction of anything not named `apron-*`.
+
+### Line endings
+
+`.gitattributes` normalises text to LF. The build machine is Windows and the images are
+Linux; without it a shell script, a SQL migration or a Dockerfile can reach the image with
+CRLF endings. This is cheap to prevent and tedious to diagnose.
+
+### CI
+
+`.github/workflows/ci.yml`, five jobs, on every pull request and every push to `main`:
+
+| Job | What it proves |
+| --- | --- |
+| `static` | lint, typecheck |
+| `unit` | 515 unit tests, plus the AI evals offline against the scripted adapter |
+| `integration` | integration and contract suites against **postgres:16-alpine** and **redis:7-alpine** service containers — the same versions Compose runs, so a failure is a real failure and not a version difference |
+| `build` | `build:all`, then asserts `.next/standalone/.next/static`, `public/`, and all three `dist-worker` entrypoints exist |
+| `image` | builds **both** the `web` and `worker` targets |
+
+Two details carried over from what this build learned the hard way. The `build` job asserts
+the standalone output is complete because Next omits `.next/static` and `public/` from it and
+a deployment missing them serves a working API and an unstyled page — healthy in logs, broken
+to a user. And the `image` job builds the worker as well as the web target, because the worker
+owns SLA expiry, re-matching and notification delivery; a green web image alone is not a
+deployable stack.
+
+There is no screenshot, video, visual-regression or recorded-browser job, per CLAUDE.md §34.
+
+### Security scanning
+
+`.github/workflows/security.yml`, satisfying CLAUDE.md §27 — gitleaks over full history
+(a secret committed and later removed is still leaked), `npm audit` failing on high-severity
+advisories in the **runtime** tree only, and Trivy against both images. Each tool runs from a
+pinned container image rather than a marketplace action, so what runs is visible in the diff
+and an upgrade is an explicit edit rather than a tag that moved.
+
+The weekly schedule exists because advisories land after a commit does.
+
+### Open — needed from the owner
+
+These block the next step and cannot be assumed safely (CLAUDE.md §33: continuing would mean
+inventing credentials, which §36 forbids).
+
+1. **GitHub authentication.** The `gh` token in the keyring is invalid; re-auth needs
+   `repo` and `workflow` scopes — without `workflow`, pushing `.github/workflows/` is rejected.
+2. **Repository owner and name**, and confirmation it is **private** — the seed's development
+   password is published in this codebase by design.
+3. **The AWS account for Apron**, and how credentials reach this machine.
+4. **IAM Identity Center**: whether it is enabled, its start URL and its home region — which
+   is not necessarily `us-east-2`, even though Apron deploys there.
+5. **`SEED_PASSWORD`** placed in Secrets Manager by the owner, never shared into a chat and
+   never committed.
+
+### Not yet written
+
+`deploy.yml` is deliberately held until the Terraform exists. It assumes a GitHub OIDC role
+whose trust policy names this exact repository, and that role is created by the Terraform;
+writing the workflow first would mean guessing the account ID, the role ARN, the ECR
+repository and the cluster and service names, and quietly being wrong about all five.
