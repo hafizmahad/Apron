@@ -1,13 +1,17 @@
 node_modules/
-.next/
-out/
-dist-worker/
-# Anchored. Unanchored, this matched `src/app/provider/coverage/` as well as the test
+/.next/
+/out/
+/dist-worker/
+# Anchored, like the build artefacts above. `node_modules/`, `.idea/` and `.vscode/` are
+# deliberately left unanchored: they legitimately appear at depth and no route will ever
+# be called that. A plain English word like this one will.
+#
+# Unanchored, this matched `src/app/provider/coverage/` as well as the test
 # coverage report, so the Provider portal's coverage page was never committed — it worked
 # locally, where the container builds from the working directory, and 404'd in the
 # deployed image, which is built from the repository.
 /coverage/
-.apron-storage/
+/.apron-storage/
 *.tsbuildinfo
 next-env.d.ts
 
@@ -25,7 +29,7 @@ Thumbs.db
 
 # The supplied asset pack. Its contents are committed under public/assets/apron/,
 # which is what the application serves (CLAUDE.md §21); this is the untracked original.
-apron-production-assets/
+/apron-production-assets/
 
 # Microsoft Office lock files, created while a .docx or .xlsx in handover/ is open.
 ~$*
