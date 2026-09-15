@@ -128,7 +128,11 @@ resource "aws_cloudfront_distribution" "main" {
     # block gaining `acm_certificate_arn` — the `us_east_1` provider alias in versions.tf
     # is already declared for exactly that.
     cloudfront_default_certificate = true
-    minimum_protocol_version       = "TLSv1.2_2021"
+
+    # No `minimum_protocol_version` here. It applies only to a custom certificate; with
+    # the default one CloudFront fixes the policy itself and reports back "TLSv1"
+    # regardless of what is asked for, so setting it produces a diff on every single plan
+    # and changes nothing. A plan that is never empty is a plan people stop reading.
   }
 
   tags = { Name = "${var.name}-cdn" }

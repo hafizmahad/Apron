@@ -21,15 +21,21 @@ resource "aws_db_parameter_group" "main" {
   name_prefix = "${var.name}-pg16-"
   family      = "postgres16"
 
+  # `apply_method` is explicit because this one is static: it cannot take effect until the
+  # instance reboots, and leaving it to the provider's "immediate" default makes every
+  # future plan show a change that is not one.
   parameter {
-    name  = "rds.force_ssl"
-    value = "1"
+    name         = "rds.force_ssl"
+    value        = "1"
+    apply_method = "pending-reboot"
   }
 
-  # Slow queries are the first thing anyone asks for when a page feels wrong.
+  # Slow queries are the first thing anyone asks for when a page feels wrong. Dynamic, so
+  # it applies without waiting for anything.
   parameter {
-    name  = "log_min_duration_statement"
-    value = "1000"
+    name         = "log_min_duration_statement"
+    value        = "1000"
+    apply_method = "immediate"
   }
 
   lifecycle {

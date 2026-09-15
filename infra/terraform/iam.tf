@@ -161,6 +161,27 @@ data "aws_iam_policy_document" "github_deploy" {
     resources = ["*"]
   }
 
+  # The pipeline looks the subnets and the security group up by tag rather than being
+  # handed their ids, so that renumbering the network does not mean editing a workflow.
+  # EC2 Describe calls do not support resource-level permissions, hence "*"; they are
+  # read-only and reveal nothing the account's own tags do not.
+  statement {
+    sid       = "FindTheNetwork"
+    actions   = ["ec2:DescribeSubnets", "ec2:DescribeSecurityGroups"]
+    resources = ["*"]
+  }
+
+  # A one-off task's report is in its log stream, and a verification that failed is
+  # exactly when someone needs to read it without opening the console.
+  statement {
+    sid = "ReadTaskLogs"
+    actions = [
+      "logs:GetLogEvents",
+      "logs:DescribeLogStreams",
+    ]
+    resources = ["${aws_cloudwatch_log_group.tasks.arn}:*"]
+  }
+
   # RegisterTaskDefinition and RunTask both hand a role to ECS, which needs explicit
   # permission to pass it. Narrowed to the two roles this stack defines, so the deploy
   # role cannot attach a more privileged one to a task it starts.
