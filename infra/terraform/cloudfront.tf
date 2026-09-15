@@ -23,10 +23,21 @@ data "aws_cloudfront_cache_policy" "caching_optimized" {
   name = "Managed-CachingOptimized"
 }
 
-# Forwards every header, cookie and query string except Host — the origin should see the
-# ALB's own host, not the CloudFront domain.
-data "aws_cloudfront_origin_request_policy" "all_viewer_except_host" {
-  name = "Managed-AllViewerExceptHostHeader"
+# Forwards every header, cookie and query string, Host included.
+#
+# Host included is the whole point, and it took a broken sign-in to learn why. Next
+# verifies a Server Action by comparing the request's Origin against its Host, and every
+# mutation in this product is a Server Action — including the login form. With
+# `AllViewerExceptHostHeader` the origin saw `Host: apron-alb-….elb.amazonaws.com` while
+# the browser sent `Origin: https://d1ciksvorhzrk8.cloudfront.net`, so every action was
+# rejected: pages rendered, the login form submitted, and the response was a 500 with no
+# cookie set. Nobody could sign in.
+#
+# The ALB does not route on Host — the listener matches only the secret header — so
+# forwarding the viewer's Host costs nothing there and gives the application the name the
+# user actually typed, which is what it should have been seeing all along.
+data "aws_cloudfront_origin_request_policy" "all_viewer" {
+  name = "Managed-AllViewer"
 }
 
 locals {
@@ -78,7 +89,7 @@ resource "aws_cloudfront_distribution" "main" {
     cached_methods  = ["GET", "HEAD"]
 
     cache_policy_id          = data.aws_cloudfront_cache_policy.caching_disabled.id
-    origin_request_policy_id = data.aws_cloudfront_origin_request_policy.all_viewer_except_host.id
+    origin_request_policy_id = data.aws_cloudfront_origin_request_policy.all_viewer.id
 
     compress = true
   }
