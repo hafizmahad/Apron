@@ -110,10 +110,29 @@ data "aws_iam_policy_document" "github_assume" {
       values   = ["sts.amazonaws.com"]
     }
 
+    # Two exact subjects, not a wildcard.
+    #
+    # GitHub now issues the immutable form, which carries the numeric owner and repository
+    # ids alongside the names:
+    #
+    #   repo:hafizmahad@132822998/Apron@1371862777:ref:refs/heads/main
+    #
+    # The names in it are a convenience; the ids are the identity, and they survive the
+    # repository or the account being renamed — which is the whole reason GitHub added
+    # them, and the reason this is the better thing to trust.
+    #
+    # The legacy name-only form is listed as well because GitHub has issued both and a
+    # deployment should not stop because a claim format was rolled forward or back.
+    # StringEquals over a list is an OR of exact matches, so neither entry widens the
+    # other: a different repository, a different account or a different branch matches
+    # nothing here.
     condition {
       test     = "StringEquals"
       variable = "token.actions.githubusercontent.com:sub"
-      values   = ["repo:${var.github_repository}:ref:refs/heads/${var.github_deploy_branch}"]
+      values = [
+        "repo:${var.github_repository}:ref:refs/heads/${var.github_deploy_branch}",
+        "repo:${var.github_owner}@${var.github_owner_id}/${var.github_repository_name}@${var.github_repository_id}:ref:refs/heads/${var.github_deploy_branch}",
+      ]
     }
   }
 }

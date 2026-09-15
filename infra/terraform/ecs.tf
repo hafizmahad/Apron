@@ -128,7 +128,18 @@ resource "aws_ecs_task_definition" "web" {
 
       portMappings = [{ containerPort = 3000, protocol = "tcp" }]
 
-      environment = local.environment
+      # HOSTNAME is set here and not left to the Dockerfile, because ECS injects its own
+      # into the container environment and that wins. Next reads it as the address to
+      # bind, so the server came up listening on the task's ENI address alone —
+      # `Local: http://ip-10-20-59-250.us-east-2.compute.internal:3000` in the logs.
+      #
+      # The failure that caused is nasty precisely because the product looked fine. The
+      # load balancer reaches the task by that same ENI address, so its health check
+      # passed, traffic flowed and every page worked. The *container* health check goes to
+      # 127.0.0.1, which nothing was listening on, so ECS marked every task UNHEALTHY and
+      # killed it a few minutes in — replacing tasks forever, on a service that appeared
+      # to be serving perfectly.
+      environment = concat(local.environment, [{ name = "HOSTNAME", value = "0.0.0.0" }])
       secrets     = local.secrets
 
       # The same probe the load balancer uses, so a task that cannot reach Postgres or

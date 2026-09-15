@@ -174,6 +174,41 @@ variable "github_repository" {
   default     = "hafizmahad/Apron"
 }
 
+variable "github_owner" {
+  description = "The account name on its own, for the immutable OIDC subject."
+  type        = string
+  default     = "hafizmahad"
+}
+
+variable "github_repository_name" {
+  description = "The repository name on its own, for the immutable OIDC subject."
+  type        = string
+  default     = "Apron"
+}
+
+variable "github_owner_id" {
+  description = <<-EOT
+    GitHub's numeric account id. Part of the immutable OIDC subject claim, which is what
+    GitHub actually issues:
+
+      repo:hafizmahad@132822998/Apron@1371862777:ref:refs/heads/main
+
+    Read it with: gh api repos/<owner>/<repo> --jq .owner.id
+  EOT
+  type        = number
+  default     = 132822998
+}
+
+variable "github_repository_id" {
+  description = <<-EOT
+    GitHub's numeric repository id. See `github_owner_id`.
+
+    Read it with: gh api repos/<owner>/<repo> --jq .id
+  EOT
+  type        = number
+  default     = 1371862777
+}
+
 variable "github_deploy_branch" {
   description = "The only branch allowed to assume the deploy role."
   type        = string
