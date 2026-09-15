@@ -132,18 +132,27 @@ variable "redis_node_type" {
 
 # --- AI --------------------------------------------------------------------
 
-variable "openai_api_key" {
+variable "ai_enabled" {
   description = <<-EOT
-    Optional. Leave empty and the platform runs with AI off, which is a supported state
-    rather than a degraded one: intake falls back to the manual structured form and
-    matching uses the deterministic top-ranked eligible candidate (CLAUDE.md §22,
-    Journey E). Supply it and the four model names below become required.
+    Whether the platform calls OpenAI.
 
-    Prefer setting it in Secrets Manager afterwards over putting it in a tfvars file.
+    False is a supported state rather than a degraded one: intake falls back to the manual
+    structured form and matching uses the deterministic top-ranked eligible candidate
+    (CLAUDE.md §22, Journey E). True requires a real key in the `apron/openai-api-key`
+    secret and makes the four model names below load-bearing — the process refuses to
+    start without them.
+
+    **The key itself is not a Terraform variable.** It is written to Secrets Manager
+    directly, so it never passes through a plan, an apply log, or the state file — which
+    is not encrypted client-side and is read by anyone who can read the state bucket.
+    Terraform creates the secret with a placeholder and never looks at the value again.
+
+      aws secretsmanager put-secret-value --secret-id apron/openai-api-key \
+        --secret-string "sk-..."
+      terraform apply -var="ai_enabled=true"
   EOT
-  type        = string
-  sensitive   = true
-  default     = ""
+  type        = bool
+  default     = false
 }
 
 variable "openai_intake_model" {

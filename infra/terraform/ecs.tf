@@ -10,7 +10,7 @@
  */
 
 locals {
-  ai_enabled = var.openai_api_key != ""
+  ai_enabled = var.ai_enabled
 
   web_image    = "${aws_ecr_repository.app["web"].repository_url}:${var.image_tag}"
   worker_image = "${aws_ecr_repository.app["worker"].repository_url}:${var.image_tag}"

@@ -96,9 +96,16 @@ resource "aws_secretsmanager_secret" "openai_api_key" {
 
 resource "aws_secretsmanager_secret_version" "openai_api_key" {
   secret_id = aws_secretsmanager_secret.openai_api_key.id
-  # A placeholder rather than an empty string: Secrets Manager will not store an empty
-  # value, and the task only reads this secret when AI is switched on.
-  secret_string = var.openai_api_key == "" ? "unset" : var.openai_api_key
+
+  # A placeholder, and only ever a placeholder. The real key is written straight to
+  # Secrets Manager with `put-secret-value`, so it never passes through a plan, an apply
+  # log or the state file — state is not encrypted client-side and holds every value
+  # Terraform has seen. `ignore_changes` is what keeps the real key from being replaced
+  # by this string on the next apply.
+  #
+  # An empty string is not an option: Secrets Manager will not store one, and the task
+  # only reads this secret when AI is switched on.
+  secret_string = "unset"
 
   lifecycle {
     ignore_changes = [secret_string]

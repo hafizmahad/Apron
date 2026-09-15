@@ -2,7 +2,11 @@ node_modules/
 .next/
 out/
 dist-worker/
-coverage/
+# Anchored. Unanchored, this matched `src/app/provider/coverage/` as well as the test
+# coverage report, so the Provider portal's coverage page was never committed — it worked
+# locally, where the container builds from the working directory, and 404'd in the
+# deployed image, which is built from the repository.
+/coverage/
 .apron-storage/
 *.tsbuildinfo
 next-env.d.ts
@@ -37,4 +41,3 @@ crash.*.log
 # Saved plans. A plan is applied from the machine that made it, never committed.
 tfplan
 *.tfplan
-.terraform.lock.hcl
