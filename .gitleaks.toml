@@ -1,0 +1,27 @@
+# gitleaks configuration.
+#
+# The default ruleset is kept in full. What follows only excuses values that are
+# deliberately published in this repository, named individually so that a real
+# credential pasted into any file — a test included — still fails the scan.
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Fixture and development credentials that are public by design"
+
+# Narrow on purpose: these are the exact literals, not a path or a rule exemption.
+#
+#   Correct-Horse-Battery-2026  a fixture in tests/integration/auth/session.test.ts. The
+#                               suite hashes it with argon2 and signs in with it to prove a
+#                               session token is never recoverable from what is persisted.
+#                               It authenticates nothing outside that test.
+#
+#   Apron!Dev2026               the seed's fallback development password (CLAUDE.md §27).
+#                               It is published deliberately, which is precisely why the
+#                               seed refuses to run against a non-local APP_ENV while it is
+#                               still in use. A deployed environment sets SEED_PASSWORD.
+regexes = [
+  '''Correct-Horse-Battery-2026''',
+  '''Apron!Dev2026''',
+]

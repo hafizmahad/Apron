@@ -1,9 +1,10 @@
 # Handover pack
 
-Two files, both plain black and white, meant to be sent together by email.
+Three files, all plain black and white, meant to be sent together by email.
 
 | File | What it is |
 | --- | --- |
+| `Apron - Architecture.svg` | One page showing the whole system: who uses it, the four portals, what decides what, where the data lives, and the eight steps a request travels. Opens in any browser and in Word; scales to any size without blurring. |
 | `Apron - Platform Overview.docx` | What the platform is, the four portals, and how a request travels from a sentence to confirmed suppliers. Written for someone who has not seen it before and is not technical. |
 | `Apron - Sign-in accounts.xlsx` | Every sign-in account: portal, role, name, organisation, email, which portal it opens, and what it can do. 27 accounts across the 4 portals. |
 
@@ -24,6 +25,10 @@ Both files are generated from the live database, so they cannot drift from reali
 node scripts/build-overview-doc.mjs  --out "handover/Apron - Platform Overview.docx"
 node scripts/build-account-sheet.mjs --out "handover/Apron - Sign-in accounts.xlsx"
 ```
+
+The architecture diagram is hand-maintained SVG. Its figures are drawn from the code —
+37 permissions across 7 roles, 42 tables, four exclusion constraints, three queues — so
+check them if the system changes.
 
 The account sheet reads `users` from the running stack. Add a provider or a client and
 re-running picks them up.
