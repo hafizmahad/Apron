@@ -25,3 +25,13 @@ apron-production-assets/
 
 # Microsoft Office lock files, created while a .docx or .xlsx in handover/ is open.
 ~$*
+
+# Terraform: providers, state and anything holding a value.
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+crash.log
+crash.*.log
+.terraform.lock.hcl
