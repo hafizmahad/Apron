@@ -34,4 +34,7 @@ apron-production-assets/
 !*.tfvars.example
 crash.log
 crash.*.log
+# Saved plans. A plan is applied from the machine that made it, never committed.
+tfplan
+*.tfplan
 .terraform.lock.hcl

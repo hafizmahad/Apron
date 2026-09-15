@@ -434,3 +434,110 @@ having had the abstraction.
   fact reached someone.
 - The single environment means the local Docker stack is the only rehearsal available for the
   deployed one, which raises rather than lowers the bar on Phase 12.
+
+---
+
+## ADR-021 — CloudFront terminates TLS, because the session cookie requires it
+
+**Status:** accepted · **Date:** 2026-09-16
+
+### Context
+
+The deployed stack needs an address a person can be sent. The obvious one is the load
+balancer's own name, `apron-alb-….us-east-2.elb.amazonaws.com`.
+
+It does not work, and the way it fails is worth writing down because nothing about it is
+visible from the outside.
+
+`sessionCookieOptions()` issues the session cookie `secure: true` for any `APP_ENV` other
+than `local` — correct, and the only defensible setting for a deployed environment. A
+browser will not store a `Secure` cookie received over plain HTTP. An ALB can only serve
+plain HTTP here, because no public certificate authority will issue a certificate for a
+name under `amazonaws.com`, and there is no custom domain.
+
+So: the site loads. The login form accepts the password. The server verifies it, creates a
+real session row, and sets the cookie. The browser discards it. The next request is
+unauthenticated and the user is returned to the login page. No error is raised, nothing
+appears in the logs, and retrying does exactly the same thing. Every portal is unreachable,
+and the application is behaving correctly throughout.
+
+Three ways out: a custom domain with an ACM certificate on the ALB; CloudFront, which
+serves its own `*.cloudfront.net` name under its own certificate; or relaxing the cookie,
+which means sending session tokens over plaintext and is not a candidate.
+
+### Decision
+
+**CloudFront in front of the ALB, for TLS.** No domain is owned, and this needs none.
+
+`CLAUDE.md` §3 says "CloudFront only if needed for document/static delivery". This is a
+different justification than the one anticipated there — it is needed so that a working
+link exists at all — and it is recorded here rather than read into that sentence.
+
+**The distribution is not a page cache.** Every portal route is authenticated and every
+page is per-user; caching HTML would serve one operator's request list to another. The
+default behaviour uses `Managed-CachingDisabled` with `Managed-AllViewerExceptHostHeader`,
+and forwards every method, because each mutation in the product is a server action posting
+to the page's own path. Only `/_next/static/*`, whose filenames carry a content hash, and
+`/assets/*` are cached.
+
+**The origin hop is closed twice.** The ALB security group admits only CloudFront's managed
+`origin-facing` prefix list, and the listener's default action is a flat 403 — traffic
+reaches the application only through a rule matching a secret header CloudFront adds and
+overwrites, so a viewer cannot forge it. Someone who discovers the ALB's DNS name can
+neither connect to it nor bypass CloudFront if they could.
+
+### Consequences
+
+- `APP_URL` is the CloudFront domain. Absolute links in notifications and generated
+  documents are built from it, so it has to be what a person actually opens.
+- Replacing an asset needs an invalidation of `/assets/*`. `/_next/static/*` never does,
+  because those filenames change with their contents.
+- Moving to a custom domain later is an ACM certificate in us-east-1, an `aliases` entry
+  and one changed block. The `us_east_1` provider alias is already declared for it.
+- A CloudFront distribution takes ten to fifteen minutes to deploy or to change. That is a
+  property of the first apply, not of a deployment — deployments update ECS services and
+  never touch the distribution.
+
+---
+
+## ADR-022 — The pipeline verifies the deployment against the deployment
+
+**Status:** accepted · **Date:** 2026-09-16
+
+### Context
+
+This build repeatedly found that a fix proven on one runtime was not proven on another.
+`LOG_PRETTY=true` crashed every server action inside the container while the identical
+code worked outside it. Next's standalone output omits `.next/static` and `public/`, so a
+deployment missing the copy step serves a working API and an unstyled page — healthy in
+every log, broken to every user. And the seed could not run from the container image at
+all, because argon2 was bundled rather than external, while it ran perfectly from source.
+
+None of those is visible to a test suite run on a developer's machine, or on a CI runner,
+or in a build log. All three are visible to a request made against the thing that was
+actually deployed.
+
+### Decision
+
+`deploy.yml` ends by running `npm run smoke`, `npm run verify:routing` and
+`npm run verify:rbac` with `BASE` set to the public URL, and fails the workflow if any of
+them fails. The deployment is not finished when the services reach a stable state; it is
+finished when the deployed application answers correctly.
+
+Two supporting rules follow from the same reasoning:
+
+- **Migrations run before the services are updated, and their exit code is waited on.** A
+  deploy that pushed an image expecting a column that does not exist is worse than a deploy
+  that did not happen.
+- **Image tags are commit SHAs and the ECR repositories are `IMMUTABLE`.** "Which code is
+  running" is then answerable from the tag alone, which is the single most useful property
+  to have during an incident.
+
+### Consequences
+
+- A deployment takes as long as the verification does. That is the price, and it is small.
+- `verify:rbac` runs against production on every deploy, signing in as seeded accounts and
+  attempting cross-tenant access. It is read-only and its failures are the ones worth
+  waking up for (Journey G).
+- The same three commands are what a person runs by hand after a manual change, so there is
+  one definition of "it works" rather than two.

@@ -1850,6 +1850,86 @@ and an upgrade is an explicit edit rather than a tag that moved.
 
 The weekly schedule exists because advisories land after a commit does.
 
+### What CI found on its first run
+
+Both workflows failed, and every failure was real rather than a workflow bug. Worth
+recording, because each had been sitting in the repository unnoticed.
+
+**`tests/contracts/` was empty.** `CLAUDE.md` asks for API/route contract tests in §3,
+lists them in Phase 11 and names `npm run test:contracts` as a gate in §34. The script and
+the vitest project both existed; the directory had nothing in it. Nobody noticed because
+running it locally exits 1 with "No test files found", which looks like a configuration
+problem rather than an absent suite. There are now 17, covering both HTTP routes — the
+health envelope including the 503 an ALB depends on, and `/api/documents/[id]` performing
+Journey G for real through the route with a real session cookie.
+
+**Three high-severity advisories in the runtime dependency tree.** drizzle-orm carried a
+SQL-injection advisory for improperly escaped identifiers, which the seed and the test
+helpers both rely on; nodemailer carried twelve; postcss, through the copy next vendors,
+carried four. All three are closed. `npm audit --omit=dev` now reports zero.
+
+**The drizzle upgrade broke something that no test would have caught for the right
+reason.** 0.45 wraps driver errors, so `src/services/assignments.ts` — which recognised a
+double-booking by reading `error.code` for SQLSTATE 23P01 — silently stopped matching. An
+exclusion-constraint refusal would have surfaced as an unhandled failure instead of a
+`resource_conflict`, which is the mechanism Journey A step 10 rests on. `sqlState` now
+walks the cause chain and lives in `src/lib/errors`, with the test helpers re-exporting it
+rather than keeping a copy.
+
+**A test-fixture password tripped gitleaks.** `.gitleaks.toml` keeps the default ruleset
+in full and excuses two literals by name rather than exempting a path or a rule, so a real
+credential pasted into a test still fails the scan.
+
+**Both images failed Trivy.** The worker carried the build's dependencies, so esbuild's Go
+binary shipped in an image that never runs it, with a Go standard-library CVE attached;
+and the npm the base image bundles vendors its own tar, sigstore and picomatch. A
+prod-deps stage, `apt-get upgrade`, and removing npm from the runtime images — nothing at
+runtime invokes it — take both to **zero HIGH or CRITICAL findings**.
+
+### The deployment blocker the image fixes uncovered
+
+`scripts/build-worker.mjs` left argon2 out of its externals, so esbuild bundled a native
+module whose CommonJS entry reads `__dirname` to find its own `.node` binary — and an ESM
+bundle has no `__dirname`. **The seed could not run from the container image at all**; it
+failed at the first password hash with "the argon2 module could not be loaded".
+
+`docker-compose.yml` documents `docker compose run --rm seed` and the handoff says seeding
+is part of deployment rather than a local convenience, because it is what creates the
+airports, the catalogue and the first administrator. It would have failed on the first
+deploy, at the step with no way around it. argon2 is now external in the worker bundle and
+named in `next.config.ts` `serverExternalPackages`. Verified by running the seed from the
+rebuilt image: it completes and reports its row counts.
+
+### Seeded data
+
+Audited against what the seed declares. All sixteen reference tables populated, matching
+the documented counts. One discrepancy: `src/db/seed/reference/network.ts` has always said
+the network contains "a provider with a blackout window", and `provider_blackouts` seeded
+empty while `eligibility.ts` carried a fully implemented `blackout_window` rejection. Two
+windows now exist, one coverage-scoped and one company-wide, anchored three weeks out so
+they are inert to the scenario requests and the integration suites.
+
+The asset pack held eleven SVG sources with no counterpart under `public/assets/apron` —
+the five portal backgrounds and the six service images, committed only as `.webp`. With
+the pack itself untracked they were about to exist on one machine. The two trees now match
+file for file.
+
+### Infrastructure
+
+`infra/terraform/`, validated with Terraform 1.16.2. The plan and its reasoning are in
+`docs/INFRASTRUCTURE_PLAN.md`.
+
+**CloudFront is in front of the ALB for TLS, not for caching.** `APP_ENV=production`
+issues the session cookie `Secure`; a browser will not store a `Secure` cookie over plain
+HTTP; an ALB cannot hold a public certificate for its own `amazonaws.com` name. Without it
+the site would load, accept a password, create a real session, and bounce every user back
+to the login page with nothing in the logs. Only `/_next/static/*` and `/assets/*` are
+cached — every portal page is per-user.
+
+Applied so far: the state bucket, the two ECR repositories, and the first images pushed
+(`linux/amd64`, tagged with the commit SHA, repositories set IMMUTABLE so a tag answers
+"which code is running").
+
 ### Open — needed from the owner
 
 These block the next step and cannot be assumed safely (CLAUDE.md §33: continuing would mean
