@@ -1,6 +1,6 @@
 import '@/lib/server-guard';
 import { attemptLogin } from '@/auth/login';
-import { revokeSession } from '@/auth/session';
+import { resolveSession, revokeSession } from '@/auth/session';
 import { getDb } from '@/db/client';
 import { sql } from 'drizzle-orm';
 import { getEnv, isAiEnabled } from '@/lib/config/env';
@@ -33,6 +33,16 @@ const BASE = (process.env['BASE'] ?? process.env['APP_URL'] ?? 'http://127.0.0.1
   '',
 );
 const TIMEOUT_MS = Number(process.env['SMOKE_TIMEOUT_MS'] ?? 15_000);
+
+/** The four entities Next escapes into a hidden input's value attribute. */
+function decodeEntities(value: string): string {
+  return value
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&');
+}
 
 let failures = 0;
 let checks = 0;
@@ -143,6 +153,71 @@ if (login.kind === 'ok') {
   );
 
   await revokeSession(login.session.sessionId);
+}
+
+// --- 4b. the sign-in FORM works, not just the function ---------------------
+//
+// This exists because everything above passed while nobody could sign in.
+//
+// `attemptLogin` is a function call. The form is a Next Server Action, and Next verifies
+// one by comparing the request's Origin against its forwarded host — so a CDN that
+// rewrites the Host header rejects every action while leaving every page rendering
+// perfectly. That is exactly what happened: 340/340 routing checks green, health 200, and
+// a 500 with no cookie for any human who typed a password.
+//
+// Posting the form's own hidden fields with no `Next-Action` header is the progressive
+// enhancement path — what a browser sends with JavaScript disabled — which reaches the
+// same action through the same verification, and is the one shape of this request that
+// can be reproduced faithfully without a browser.
+const loginPage = await get('/login');
+const loginHtml = loginPage?.status === 200 ? await loginPage.text() : '';
+const hiddenFields = [...loginHtml.matchAll(/<input\b[^>]*type="hidden"[^>]*>/g)]
+  .map((match) => {
+    const tag = match[0];
+    const name = /name="([^"]+)"/.exec(tag)?.[1];
+    const value = /value="([^"]*)"/.exec(tag)?.[1] ?? '';
+    return name === undefined ? null : ([name, decodeEntities(value)] as const);
+  })
+  .filter((entry): entry is readonly [string, string] => entry !== null);
+
+if (hiddenFields.length === 0) {
+  report('sign-in form posts', false, 'no action fields found on /login');
+} else {
+  const form = new FormData();
+  for (const [name, value] of hiddenFields) form.append(name, value);
+  form.append('email', email);
+  form.append('password', password);
+
+  let status = 0;
+  let sessionCookie: string | null = null;
+  try {
+    const posted = await fetch(`${BASE}/login`, {
+      method: 'POST',
+      body: form,
+      // A browser sends both, and the Origin is half of what Next compares.
+      headers: { origin: BASE, referer: `${BASE}/login` },
+      redirect: 'manual',
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
+    status = posted.status;
+    sessionCookie = posted.headers.get('set-cookie');
+  } catch (error) {
+    report('sign-in form posts', false, `request failed: ${String(error)}`);
+  }
+
+  // 303 and a session cookie, or it did not sign anyone in — whatever the status says.
+  const accepted = status === 303 && sessionCookie !== null && sessionCookie.includes(env.SESSION_COOKIE_NAME);
+  report(
+    'sign-in form posts',
+    accepted,
+    accepted ? `HTTP 303, ${env.SESSION_COOKIE_NAME} set` : `HTTP ${String(status)}, cookie ${sessionCookie === null ? 'absent' : 'present'}`,
+  );
+
+  if (accepted && sessionCookie !== null) {
+    const token = /(?:^|;\s*)([^=]+)=([^;]+)/.exec(sessionCookie)?.[2];
+    const resolved = token === undefined ? null : await resolveSession(token);
+    if (resolved !== null) await revokeSession(resolved.sessionId);
+  }
 }
 
 // --- 5. the database was migrated and seeded -------------------------------
