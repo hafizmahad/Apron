@@ -179,3 +179,55 @@ export function toApronError(value: unknown, fallbackMessage = 'Unexpected error
   }
   return new ApronError('internal', fallbackMessage, { details: { thrown: String(value) } });
 }
+
+/**
+ * The Postgres `SQLSTATE` a failure carries, following the `cause` chain to find it.
+ *
+ * Drizzle wraps driver errors, so the `code` the database set is not always on the error
+ * that reaches a catch block — it can sit one or more `cause` links down. Reading only the
+ * top-level property silently stopped recognising constraint violations when the ORM
+ * changed how it reports them, which turned a handled `resource_conflict` into an
+ * unhandled failure. Walking the chain is version-independent: it finds the code whether
+ * the driver error is thrown directly or wrapped.
+ */
+export function sqlState(error: unknown): string | null {
+  return findOnCauseChain(error, 'code');
+}
+
+/** The constraint a failure names, following the `cause` chain. See {@link sqlState}. */
+export function violatedConstraint(error: unknown): string | null {
+  return findOnCauseChain(error, 'constraint');
+}
+
+/**
+ * The message the database itself produced, from the deepest link of the `cause` chain.
+ *
+ * Drizzle prefixes what it throws with `Failed query: ...`, so the text a check constraint
+ * or a trigger actually raised — the part that says *why* — is no longer the top-level
+ * message. This reaches past the wrapper to it.
+ */
+export function databaseMessage(error: unknown): string {
+  let current: unknown = error;
+  let deepest = '';
+
+  for (let depth = 0; depth < 8; depth += 1) {
+    if (typeof current !== 'object' || current === null) break;
+    const message = (current as { message?: unknown }).message;
+    if (typeof message === 'string' && message !== '') deepest = message;
+    current = (current as { cause?: unknown }).cause;
+  }
+
+  return deepest === '' ? String(error) : deepest;
+}
+
+/** Bounded so a self-referential `cause` cannot spin. */
+function findOnCauseChain(error: unknown, property: 'code' | 'constraint'): string | null {
+  let current: unknown = error;
+  for (let depth = 0; depth < 8; depth += 1) {
+    if (typeof current !== 'object' || current === null) return null;
+    const value = (current as Record<string, unknown>)[property];
+    if (typeof value === 'string') return value;
+    current = (current as { cause?: unknown }).cause;
+  }
+  return null;
+}

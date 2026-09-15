@@ -58,19 +58,15 @@ export async function captureError(fn: () => Promise<unknown>): Promise<Error> {
   throw new Error('Expected the operation to throw, but it resolved successfully');
 }
 
-/** The Postgres `SQLSTATE` of a driver error, or null when it is not a database error. */
-export function sqlState(error: unknown): string | null {
-  if (typeof error !== 'object' || error === null) return null;
-  const code = (error as { code?: unknown }).code;
-  return typeof code === 'string' ? code : null;
-}
-
-/** The constraint name a database error names, when it names one. */
-export function violatedConstraint(error: unknown): string | null {
-  if (typeof error !== 'object' || error === null) return null;
-  const constraint = (error as { constraint?: unknown }).constraint;
-  return typeof constraint === 'string' ? constraint : null;
-}
+/**
+ * Re-exported from the production module rather than reimplemented.
+ *
+ * These read the same driver error the application reads. A test copy would have gone on
+ * passing while `src/services/assignments.ts` stopped recognising the same violation,
+ * which is exactly the divergence CLAUDE.md §9 forbids for the eligibility oracle and is
+ * no less dangerous here.
+ */
+export { databaseMessage, sqlState, violatedConstraint } from '@/lib/errors';
 
 /** Direct pool access for tests that need two concurrent sessions. */
 export async function withTwoSessions<T>(

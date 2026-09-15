@@ -12,7 +12,7 @@ import {
 import type { ResourceKind, UserRole } from '@/db/schema/enums';
 import { recordAuditEvent } from '@/domain/audit';
 import { transitionLine } from '@/domain/requests/state-machine';
-import { ApronError } from '@/lib/errors';
+import { ApronError, sqlState } from '@/lib/errors';
 import { logger } from '@/lib/logging';
 import { refreshRequestStatus } from './offers';
 import { emitNotification } from './notifications';
@@ -428,10 +428,4 @@ function readableKind(kind: ResourceKind): string {
     case 'fuel':
       return 'fuel truck';
   }
-}
-
-function sqlState(error: unknown): string | null {
-  if (typeof error !== 'object' || error === null) return null;
-  const code = (error as { code?: unknown }).code;
-  return typeof code === 'string' ? code : null;
 }

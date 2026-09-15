@@ -4,6 +4,7 @@ import { getDb } from '@/db/client';
 import * as schema from '@/db/schema';
 import {
   captureError,
+  databaseMessage,
   ensureMigrated,
   sqlState,
   truncateAll,
@@ -344,7 +345,7 @@ describe('request constraints', () => {
       `),
     );
     expect(sqlState(error)).toBe(CHECK_VIOLATION);
-    expect(String(error.message)).toMatch(/belongs to airport/i);
+    expect(databaseMessage(error)).toMatch(/belongs to airport/i);
   });
 
   it('accepts an FBO that belongs to the request airport', async () => {
@@ -400,7 +401,7 @@ describe('offer constraints', () => {
 
     const error = await captureError(async () => createOffer(lineId, 2));
     expect(sqlState(error)).toBe(UNIQUE_VIOLATION);
-    expect(String(error.message)).toMatch(/provider_offers_one_live_per_line/);
+    expect(databaseMessage(error)).toMatch(/provider_offers_one_live_per_line/);
   });
 
   it('permits a new offer once the previous one is no longer live', async () => {
