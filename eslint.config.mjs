@@ -1,8 +1,6 @@
 import js from '@eslint/js';
 import tseslint from 'typescript-eslint';
-import { FlatCompat } from '@eslint/eslintrc';
-
-const compat = new FlatCompat({ baseDirectory: import.meta.dirname });
+import nextCoreWebVitals from 'eslint-config-next/core-web-vitals';
 
 /**
  * Type-aware linting is scoped to TypeScript sources only.
@@ -11,6 +9,11 @@ const compat = new FlatCompat({ baseDirectory: import.meta.dirname });
  * (`consistent-type-imports`, the floating-promise checks) fail outright on any file that
  * parser handles — including this config file. Restricting the typed block to `.ts`/`.tsx`
  * and pinning `tseslint.parser` there keeps both halves working.
+ *
+ * eslint-config-next 16 ships a native flat config, so it is spread directly. The
+ * FlatCompat bridge this used to go through now throws on it: it validates what it is
+ * given as eslintrc, and a flat config's plugin objects are circular, which the validator
+ * tries to JSON.stringify.
  */
 export default tseslint.config(
   {
@@ -26,7 +29,7 @@ export default tseslint.config(
   },
 
   js.configs.recommended,
-  ...compat.extends('next/core-web-vitals'),
+  ...nextCoreWebVitals,
 
   // --- TypeScript, with type information -----------------------------------
   {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState, useEffect, useMemo, useState, useTransition } from 'react';
+import { useActionState, useMemo, useState, useTransition } from 'react';
 import { useFormStatus } from 'react-dom';
 import { AlertTriangle, ArrowRight, Check, RotateCcw, Sparkles } from 'lucide-react';
 import { Alert, Badge, Button, Card, CardHeader } from '@/components/ui/primitives';
@@ -63,9 +63,20 @@ export function RequestComposer({ services }: { readonly services: readonly Comp
   const [clarifying, startClarifying] = useTransition();
   const [clarifyError, setClarifyError] = useState<string | null>(null);
 
-  useEffect(() => {
+  /**
+   * Adopting a new reading is an adjustment during render, not an effect.
+   *
+   * The effect this replaces set state from inside itself, which renders once with the
+   * stale draft, commits, and only then re-renders with the real one — a visible flash of
+   * the previous reading on every clarification round. Comparing against the last action
+   * result and adjusting inline re-renders before anything is committed to the screen.
+   * `setDraft` is not called on a render where nothing changed, so this terminates.
+   */
+  const [adoptedDraft, setAdoptedDraft] = useState<SerializableDraft | undefined>(undefined);
+  if (state.draft !== adoptedDraft) {
+    setAdoptedDraft(state.draft);
     if (state.draft !== undefined) setDraft(state.draft);
-  }, [state.draft]);
+  }
 
   function answer(answers: AnswerMap): void {
     if (draft === null) return;
