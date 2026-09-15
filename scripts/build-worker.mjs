@@ -30,6 +30,10 @@ await build({
     smoke: join(root, 'scripts/smoke.ts'),
     'verify-rbac': join(root, 'scripts/verify-rbac.ts'),
     'verify-routing': join(root, 'scripts/verify-routing.ts'),
+    // Scenario requests, for a deployed environment that needs something to show. They
+    // are created by calling the same services the product uses — never by inserting
+    // rows — so every status, offer and assignment is one the state machines produced.
+    scenarios: join(root, 'scripts/seed-scenarios.ts'),
   },
   outdir: join(root, 'dist-worker'),
   bundle: true,

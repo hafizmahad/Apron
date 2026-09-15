@@ -24,9 +24,21 @@ import { getEnv } from '@/lib/config/env';
 const MARKER = 'Scenario: two cars meeting a 03:00 arrival at Teterboro.';
 
 async function main(): Promise<void> {
+  // Refused by default outside local, because these are invented trips: a real operations
+  // team should never find a request nobody asked for sitting in their queue. The opt-in
+  // mirrors `APRON_ALLOW_REMOTE_SEED` in the seed — deliberate, named, and impossible to
+  // trip over — and exists so a demonstration environment can be given something to show.
   const env = getEnv();
-  if (env.APP_ENV !== 'local' && env.APP_ENV !== 'ci') {
-    throw new Error(`Refusing to create scenario requests in APP_ENV="${env.APP_ENV}".`);
+  const allowed =
+    env.APP_ENV === 'local' ||
+    env.APP_ENV === 'ci' ||
+    process.env['APRON_ALLOW_REMOTE_SCENARIOS'] === 'yes';
+
+  if (!allowed) {
+    throw new Error(
+      `Refusing to create scenario requests in APP_ENV="${env.APP_ENV}". These are invented ` +
+        'trips, not real work. Set APRON_ALLOW_REMOTE_SCENARIOS=yes to load them anyway.',
+    );
   }
 
   // Deterministic: the scenarios should look the same every time they are loaded.
