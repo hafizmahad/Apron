@@ -45,13 +45,32 @@ variable "availability_zone_count" {
 
 variable "image_tag" {
   description = <<-EOT
-    The tag both services run, normally the commit SHA the pipeline pushed.
+    The tag the task definitions reference — the commit SHA the pipeline pushed.
 
-    On the very first apply nothing has been pushed yet, so the ECR repositories are
-    created and the images pushed before the services are. See README §2.
+    **No default, deliberately.** It used to default to "bootstrap", a tag that exists in
+    no registry, so a bare `terraform apply` would quietly register task definitions
+    pointing at an image that cannot be pulled. Required means a forgotten value stops the
+    plan instead of producing a broken revision.
+
+    Read the deployed one rather than guessing:
+
+      aws ecs describe-task-definition --task-definition apron-web \
+        --query 'taskDefinition.containerDefinitions[0].image' --output text
+
+    Terraform owns the *shape* of a task definition — environment, secrets, roles, sizing,
+    health check — and the pipeline owns the *image*. They meet here, which is why a plan
+    run after a deploy shows the task definitions being replaced: Terraform's state still
+    holds the tag it last wrote. Applying that is inert, because both services carry
+    `ignore_changes = [task_definition]` and so keep running the revision the pipeline gave
+    them. What is not inert is pointing a service at Terraform's revision by hand — that
+    rolls the image back. Let the pipeline move services; it is the only thing that should.
   EOT
   type        = string
-  default     = "bootstrap"
+
+  validation {
+    condition     = can(regex("^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$", var.image_tag))
+    error_message = "image_tag must be a valid container image tag."
+  }
 }
 
 variable "web_desired_count" {

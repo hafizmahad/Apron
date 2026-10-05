@@ -161,6 +161,28 @@ the Admin console, `ops.manager@apron.local` the Operations portal.
 
 ---
 
+## Running Terraform after the pipeline has deployed
+
+`image_tag` is required and has no default, so a forgotten value stops the plan rather
+than registering task definitions that point at an image no registry has.
+
+```bash
+terraform apply -var="ai_enabled=true"   -var="image_tag=$(aws ecs describe-task-definition --task-definition apron-web     --query 'taskDefinition.containerDefinitions[0].image' --output text | sed 's/.*://')"
+```
+
+A plan run after a deploy shows the three task definitions being replaced even when
+nothing was edited. That is expected: Terraform owns the *shape* of a task definition —
+environment, secrets, roles, sizing, health check — and the pipeline owns the *image*, so
+Terraform's state still holds the tag it last wrote. Applying it is inert, because both
+services carry `ignore_changes = [task_definition]` and keep running the revision the
+pipeline gave them.
+
+What is **not** inert is pointing a service at Terraform's revision by hand — that rolls
+the running image back to whatever tag Terraform last recorded. Let the pipeline move
+services; it is the only thing that should.
+
+---
+
 ## Afterwards
 
 **Enable AI.** Optional — the platform is fully usable with it off (Journey E). Put the key
